@@ -21,8 +21,16 @@ from email.mime.text import MIMEText
 from email.mime.base import MIMEBase
 from email import encoders
 
-EMAIL_SENDER = 'bingomeeting@gmail.com'
-EMAIL_PWD = 'BingoMeetingCOVID19'
+'''BEWARE!!!
+
+If you choose to use an e-mail to automatically send the bingo cards to the e-mails \
+on the list through Gmail server, you'll have to authorize "Less-Secure Apps". 
+
+This makes the account extremely vulnerable, so I advise against using your personal account!
+'''
+
+EMAIL_SENDER = 'A_VALID_EMAIL@PROVIDER.COM'
+EMAIL_PWD = 'A_VALID_PASSWORD'
 EMAIL_SUBJECT = 'Meeting Bingo Card'
 EMAIL_BODY = "Please find your Meeting Bingo card attached!\n Have fun on those meetings!"
 
@@ -124,7 +132,9 @@ def main():
                         ),
                         html.Ul(id="emails_filename"),
 
-                        html.Button(id='submit_button', n_clicks=0, children='Submit', style=label_style),
+                        dcc.Loading(id='loading-1', children = [
+                            html.Button(id='submit_button', n_clicks=0, children='Submit', style=label_style),
+                        ]),
                         html.Div(id="result"),
                     ],
                     style = {'width': '30%', 'display': 'inline-block'}
@@ -209,13 +219,11 @@ def main():
 
         emails = parse_contents(emails_contents)        
         
-        cards = []
         for email in emails:
-            card = create_bingo_card(email, entries, n_rows, n_cols, send=True)
-            cards.append(card)
+            send_bingo_card(email, entries, n_rows, n_cols)
 
         return [
-            html.H5("Read {:d} bingo entries and {:d} e-mail addresses!".format(len(entries), len(emails))),
+            html.H5("Sent {:d}x{:d} cards to {:d} e-mail addresses!".format(n_rows, n_cols, len(emails))),
         ]
         
     
@@ -240,7 +248,7 @@ def parse_contents(contents):
 
     return entries
 
-def create_bingo_card(email, entries, n_rows, n_cols, send=True):
+def send_bingo_card(email, entries, n_rows, n_cols):
     total_entries = n_rows * n_cols
     if total_entries > len(entries):
         print("[ERROR] Number of given entries (in file) is lower than total entries requested (rows x columns).")
@@ -257,9 +265,8 @@ def create_bingo_card(email, entries, n_rows, n_cols, send=True):
     with open(out_file, 'w') as of:
         of.write(table_html)
 
-    try:
-        if send:
-            send_email(EMAIL_SENDER, EMAIL_PWD, [email], EMAIL_SUBJECT, EMAIL_BODY, [out_file])
+    try:        
+        send_email(EMAIL_SENDER, EMAIL_PWD, [email], EMAIL_SUBJECT, EMAIL_BODY, [out_file], clean=True)
     except Exception as e:
         print(e)
         return 'There was a problem sending the bingo cards in e-mail'
@@ -320,7 +327,7 @@ def generate_table(entries, n_rows, n_cols):
         }
     )
 
-def send_email(from_address, pwd, to_address, subject, body, attachments):
+def send_email(from_address, pwd, to_address, subject, body, attachments, clean=True):
     msg = MIMEMultipart()
 
     msg['From'] = from_address
@@ -338,6 +345,10 @@ def send_email(from_address, pwd, to_address, subject, body, attachments):
         # After the file is closed
         part['Content-Disposition'] = 'attachment; filename="%s"' % basename(f)
         msg.attach(part)
+
+        # Cleanup files
+        if clean:
+            os.remove(f)
 
     server = smtplib.SMTP('smtp.gmail.com', 587)
     server.starttls()
